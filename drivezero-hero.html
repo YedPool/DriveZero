@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveZero - Voice your way to zero</title>
+    <style>
+        :root {
+            --brand-primary: #02a6a1;
+            --brand-primary-hover: #028a85;
+            --brand-primary-light: #04c4be;
+            --text-white: #ffffff;
+            --text-gray: #e0e0e0;
+            --overlay-dark: rgba(0, 0, 0, 0.35);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: var(--text-white);
+        }
+
+        .hero-section {
+            min-height: 100vh;
+            background-image: linear-gradient(var(--overlay-dark), var(--overlay-dark)), url('car-dashboard-bg.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .hero-header {
+            padding: 0rem 2rem 2rem 6rem;
+            z-index: 10;
+        }
+
+        .logo {
+            height: 200px;
+            width: auto;
+            filter: brightness(1.1);
+        }
+
+        .hero-content {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            padding: 0rem 2rem 2rem 6rem;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .content-wrapper {
+            max-width: 600px;
+        }
+
+        .hero-title {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.25rem, 3vw, 1.5rem);
+            color: var(--text-gray);
+            margin-bottom: 3rem;
+            font-weight: 400;
+            max-width: 500px;
+        }
+
+        .cta-button {
+            background: var(--brand-primary);
+            color: var(--text-white);
+            border: none;
+            padding: 1rem 2.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 4px 20px rgba(2, 166, 161, 0.3);
+        }
+
+        .cta-button:hover {
+            background: var(--brand-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(2, 166, 161, 0.4);
+        }
+
+        .cta-button:active {
+            transform: translateY(0);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .hero-header {
+                padding: 1.5rem;
+            }
+
+            .hero-content {
+                padding: 1.5rem;
+                align-items: flex-start;
+                justify-content: center;
+                text-align: left;
+            }
+
+            .hero-title {
+                margin-bottom: 1rem;
+            }
+
+            .hero-subtitle {
+                margin-bottom: 2rem;
+            }
+
+            .cta-button {
+                padding: 0.875rem 2rem;
+                font-size: 1rem;
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-header {
+                padding: 1rem;
+            }
+
+            .hero-content {
+                padding: 1rem;
+            }
+
+            .logo {
+                height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero-section">
+        <header class="hero-header">
+            <img src="logo-placeholder.png" alt="DriveZero Logo" class="logo">
+        </header>
+        
+        <div class="hero-content">
+            <div class="content-wrapper">
+                <h1 class="hero-title">Arrive with inbox zero.</h1>
+                <p class="hero-subtitle">Empower your commute, conquer your inbox.</p>
+                <button class="cta-button">Launch my drive!</button>
+            </div>
+        </div>
+    </section>
+</body>
+</html>
