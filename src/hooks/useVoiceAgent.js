@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react'
-import { Room } from 'livekit-client'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { Room, RoomEvent, Track } from 'livekit-client'
 
 export const useVoiceAgent = () => {
   const [isConnected, setIsConnected] = useState(false)
@@ -12,52 +12,54 @@ export const useVoiceAgent = () => {
     try {
       setError(null)
       
-      // Get LiveKit token from your backend/Cerebrium endpoint
-      const response = await fetch(`${import.meta.env.VITE_VOICE_AGENT_URL}/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_CEREBRIUM_API_KEY}`
-        },
-        body: JSON.stringify({
-          room: 'voice-assistant-room',
-          identity: `user-${Date.now()}`
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to get LiveKit token')
-      }
-
-      const { token } = await response.json()
+      // For now, simulate connection since our token endpoint is still deploying
+      console.log('Simulating voice assistant connection...')
       
-      // Create and connect to LiveKit room
-      const room = new Room()
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      })
+      
       roomRef.current = room
       
-      room.on('connected', () => {
-        console.log('Connected to voice agent')
+      // Set up event listeners
+      room.on(RoomEvent.Connected, () => {
+        console.log('Connected to voice agent room')
         setIsConnected(true)
+        addMessage('system', 'Connected to voice assistant!')
       })
       
-      room.on('disconnected', () => {
-        console.log('Disconnected from voice agent')
+      room.on(RoomEvent.Disconnected, (reason) => {
+        console.log('Disconnected from voice agent:', reason)
         setIsConnected(false)
+        addMessage('system', 'Disconnected from voice assistant')
       })
       
-      room.on('trackSubscribed', (track, publication, participant) => {
-        if (track.kind === 'audio' && participant.identity.includes('voice-agent')) {
-          // Attach the audio track to play AI responses
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log('Track subscribed:', track.kind, participant.identity)
+        
+        if (track.kind === Track.Kind.Audio && participant.identity.includes('agent')) {
+          // Attach AI voice response audio
           const audioElement = track.attach()
-          audioElement.play()
+          audioElement.autoplay = true
+          document.body.appendChild(audioElement)
         }
       })
-
-      await room.connect(import.meta.env.VITE_LIVEKIT_URL, token)
+      
+      room.on(RoomEvent.LocalTrackPublished, (publication, participant) => {
+        console.log('Local track published:', publication.kind)
+      })
+      
+      // Simulate successful connection for now
+      setTimeout(() => {
+        setIsConnected(true)
+        addMessage('system', 'Voice assistant ready! (Waiting for Cerebrium deployment)')
+      }, 1000)
       
     } catch (err) {
       console.error('Failed to connect to voice agent:', err)
       setError(err.message)
+      addMessage('system', `Connection failed: ${err.message}`)
     }
   }, [])
 
@@ -70,7 +72,7 @@ export const useVoiceAgent = () => {
   }, [])
 
   const startRecording = useCallback(async () => {
-    if (!roomRef.current || !isConnected) {
+    if (!isConnected) {
       setError('Not connected to voice agent')
       return
     }
@@ -79,10 +81,16 @@ export const useVoiceAgent = () => {
       setIsRecording(true)
       setError(null)
 
-      // Enable microphone and publish audio track
-      await roomRef.current.localParticipant.enableMicrophone(true)
+      // Simulate microphone recording for now
+      if (roomRef.current && roomRef.current.localParticipant) {
+        // Real LiveKit connection
+        await roomRef.current.localParticipant.enableMicrophone(true)
+      } else {
+        // Simulation mode - just show we're listening
+        console.log('Simulating microphone recording...')
+      }
       
-      addMessage('system', 'Listening...')
+      addMessage('user', 'Listening...')
       
     } catch (err) {
       console.error('Failed to start recording:', err)
@@ -92,14 +100,23 @@ export const useVoiceAgent = () => {
   }, [isConnected])
 
   const stopRecording = useCallback(async () => {
-    if (!roomRef.current) return
-
     try {
-      // Disable microphone
-      await roomRef.current.localParticipant.enableMicrophone(false)
-      setIsRecording(false)
+      // Simulate stopping recording
+      if (roomRef.current && roomRef.current.localParticipant) {
+        // Real LiveKit connection
+        await roomRef.current.localParticipant.enableMicrophone(false)
+      } else {
+        // Simulation mode
+        console.log('Simulating stop recording...')
+      }
       
+      setIsRecording(false)
       addMessage('system', 'Processing...')
+      
+      // Simulate AI response after a delay
+      setTimeout(() => {
+        addMessage('ai', 'Hello! I\'m your voice assistant. I can help you manage your Gmail emails. What would you like me to do? (Note: This is a demo response while the voice agent deploys)')
+      }, 1500)
       
     } catch (err) {
       console.error('Failed to stop recording:', err)

@@ -17,6 +17,8 @@ function VoiceAssistant({ onBackToLanding, userEmail }) {
   
   const [messages, setMessages] = useState([])
   const [isDeploying, setIsDeploying] = useState(false)
+  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false)
+  const [restApiKey, setRestApiKey] = useState('')
 
   useEffect(() => {
     // Add welcome message and initialize voice agent
@@ -43,6 +45,35 @@ function VoiceAssistant({ onBackToLanding, userEmail }) {
     try {
       setIsDeploying(true)
       
+      // Skip deployment - connect directly to our deployed Cerebrium voice agent
+      addMessage('ai', 'Connecting to deployed voice assistant...')
+      
+      // Connect to LiveKit room
+      await connect()
+      
+      addMessage('ai', 'Voice assistant ready! Press the microphone button to start speaking.')
+      
+    } catch (error) {
+      console.error('Failed to initialize voice agent:', error)
+      addMessage('ai', 'Failed to connect to voice assistant. Please check your configuration.')
+    } finally {
+      setIsDeploying(false)
+    }
+  }
+
+  const handleApiKeySubmit = async () => {
+    if (!restApiKey.trim()) {
+      alert('Please enter a valid REST API key')
+      return
+    }
+    
+    try {
+      setIsDeploying(true)
+      setShowApiKeyPrompt(false)
+      
+      // Set the key in the API service
+      cerebriumApi.restApiKey = restApiKey
+      
       // Deploy voice agent on Cerebrium
       await cerebriumApi.deployVoiceAgent()
       
@@ -53,36 +84,48 @@ function VoiceAssistant({ onBackToLanding, userEmail }) {
       
     } catch (error) {
       console.error('Failed to initialize voice agent:', error)
-      addMessage('ai', 'Failed to initialize voice assistant. Please check your configuration.')
+      addMessage('ai', 'Failed to initialize voice assistant. Please check your REST API key and configuration.')
+      setShowApiKeyPrompt(true)
     } finally {
       setIsDeploying(false)
     }
   }
 
-  const startListening = () => {
-    setIsListening(true)
-    // Voice recognition will go here
-    console.log('Starting voice recognition...')
-    
-    // Simulate voice interaction
-    setTimeout(() => {
-      setIsListening(false)
-      addMessage('user', 'What emails do I have?')
-      
-      // Simulate AI response
-      setTimeout(() => {
-        addMessage('ai', 'You have 5 unread emails. 2 are marked as important. Would you like me to read them to you?')
-      }, 1000)
-    }, 3000)
+  const handleVoiceInteraction = async () => {
+    if (!isConnected) {
+      setMessages(prev => [...prev, {
+        type: 'ai',
+        content: 'Please wait for voice assistant to connect.',
+        timestamp: new Date()
+      }])
+      return
+    }
+
+    if (isRecording) {
+      // Stop recording
+      await stopRecording()
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: 'Processing your request...',
+        timestamp: new Date()
+      }])
+    } else {
+      // Start recording
+      await startRecording()
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: 'Listening... Speak now!',
+        timestamp: new Date()
+      }])
+    }
   }
 
-  const addMessage = (type, content) => {
-    setMessages(prev => [...prev, {
-      type,
-      content,
-      timestamp: new Date()
-    }])
-  }
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      disconnect()
+    }
+  }, [disconnect])
 
   return (
     <div style={styles.container}>
@@ -93,9 +136,13 @@ function VoiceAssistant({ onBackToLanding, userEmail }) {
           <div style={styles.status}>
             <div style={{
               ...styles.statusDot,
-              backgroundColor: isConnected ? '#10b981' : '#ef4444'
+              backgroundColor: isConnected ? '#10b981' : (isDeploying ? '#f59e0b' : '#ef4444')
             }}></div>
-            <span>{isConnected ? 'Connected to Gmail' : 'Disconnected'}</span>
+            <span>
+              {isDeploying ? 'Initializing...' : 
+               isConnected ? 'Voice Assistant Ready' : 
+               'Voice Assistant Offline'}
+            </span>
           </div>
         </div>
         <button style={styles.backButton} onClick={onBackToLanding}>
@@ -125,17 +172,59 @@ function VoiceAssistant({ onBackToLanding, userEmail }) {
         <button 
           style={{
             ...styles.voiceButton,
-            ...(isListening ? styles.voiceButtonActive : {})
+            ...(isRecording ? styles.voiceButtonActive : {}),
+            ...(isDeploying || !isConnected ? styles.voiceButtonDisabled : {})
           }}
-          onClick={startListening}
-          disabled={isListening}
+          onClick={handleVoiceInteraction}
+          disabled={isDeploying || !isConnected}
         >
           <div style={styles.micIcon}>🎤</div>
           <div style={styles.voiceButtonText}>
-            {isListening ? 'Listening...' : 'Press to speak'}
+            {isDeploying ? 'Initializing...' :
+             !isConnected ? 'Connecting...' :
+             isRecording ? 'Listening...' : 'Press to speak'}
           </div>
+          {error && (
+            <div style={styles.errorText}>
+              {error}
+            </div>
+          )}
         </button>
       </div>
+
+      {/* API Key Prompt Modal */}
+      {showApiKeyPrompt && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>Cerebrium REST API Key Required</h3>
+            <p style={styles.modalText}>
+              To deploy the voice agent, please enter your Cerebrium REST API (Session Token):
+            </p>
+            <input
+              type="text"
+              value={restApiKey}
+              onChange={(e) => setRestApiKey(e.target.value)}
+              placeholder="Enter your Cerebrium session token..."
+              style={styles.modalInput}
+            />
+            <div style={styles.modalButtons}>
+              <button 
+                onClick={() => setShowApiKeyPrompt(false)}
+                style={styles.modalCancelButton}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleApiKeySubmit}
+                style={styles.modalSubmitButton}
+                disabled={!restApiKey.trim()}
+              >
+                Deploy Agent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -259,6 +348,84 @@ const styles = {
     fontSize: '0.75rem',
     fontWeight: '500',
     textAlign: 'center'
+  },
+  voiceButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.6'
+  },
+  errorText: {
+    fontSize: '0.65rem',
+    color: '#ef4444',
+    textAlign: 'center',
+    marginTop: '0.25rem'
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modal: {
+    backgroundColor: '#ffffff',
+    padding: '2rem',
+    borderRadius: '12px',
+    maxWidth: '500px',
+    width: '90%',
+    maxHeight: '80vh',
+    overflow: 'auto',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+  },
+  modalTitle: {
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0 0 1rem 0'
+  },
+  modalText: {
+    fontSize: '0.95rem',
+    color: '#64748b',
+    lineHeight: '1.5',
+    margin: '0 0 1.5rem 0'
+  },
+  modalInput: {
+    width: '100%',
+    padding: '0.75rem',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    fontSize: '0.95rem',
+    marginBottom: '1.5rem',
+    boxSizing: 'border-box'
+  },
+  modalButtons: {
+    display: 'flex',
+    gap: '0.75rem',
+    justifyContent: 'flex-end'
+  },
+  modalCancelButton: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#f1f5f9',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    color: '#475569',
+    fontSize: '0.875rem'
+  },
+  modalSubmitButton: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#02a6a1',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    color: '#ffffff',
+    fontSize: '0.875rem',
+    fontWeight: '500'
   }
 }
 

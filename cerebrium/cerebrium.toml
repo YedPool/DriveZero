@@ -1,0 +1,49 @@
+[cerebrium.deployment]
+name = "gmail-voice-assistant-allinone"
+python_version = "3.11"
+include = ["."]
+exclude = ["__pycache__", "*.pyc", ".git"]
+
+[cerebrium.hardware]
+cpu = 4.0
+memory = 16.0
+compute = "AMPERE_A10"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 3
+cooldown = 120
+
+[cerebrium.build]
+dockerfile = false
+python_packages = "./requirements.txt"
+include = [".", "*.py"]
+
+[cerebrium.predict]
+python_version = "3.11"
+gpu_count = 1
+setup_commands = [
+    "apt-get update && apt-get install -y curl wget",
+    "curl -fsSL https://ollama.ai/install.sh | sh"
+]
+
+# Main entry point
+[cerebrium.app]
+main = "main.py"
+
+[cerebrium.env]
+# Required API Keys (All-in-One Deployment)
+# DEEPGRAM_API_KEY = "your-deepgram-key"    # For Nova-2 STT + Rime TTS
+# OPENAI_API_KEY = "your-openai-key"        # For GPT-4o-mini LLM
+
+# Internal service configuration (auto-configured)
+LIVEKIT_URL = "ws://localhost:7880"
+LIVEKIT_API_KEY = "devkey"
+LIVEKIT_API_SECRET = "secret"
+
+# External access ports
+LIVEKIT_EXTERNAL_PORT = "7880"
+OLLAMA_EXTERNAL_PORT = "11434"
+
+# Gmail Integration (optional)
+# GMAIL_CREDENTIALS_JSON = "your-service-account-json"

@@ -1,16 +1,31 @@
 class CerebriumAPI {
   constructor() {
-    this.apiKey = import.meta.env.VITE_CEREBRIUM_API_KEY
+    this.inferenceApiKey = import.meta.env.VITE_CEREBRIUM_API_KEY
+    this.restApiKey = import.meta.env.VITE_CEREBRIUM_REST_API_KEY
     this.baseUrl = import.meta.env.VITE_VOICE_AGENT_URL || 'https://api.cerebrium.ai'
+    this.deploymentBaseUrl = 'https://api.cerebrium.ai'
+  }
+
+  async promptForRestApiKey() {
+    if (!this.restApiKey) {
+      const key = prompt('Please enter your Cerebrium REST API (Session Token) for deployment:')
+      if (!key) {
+        throw new Error('REST API key is required for deployment')
+      }
+      this.restApiKey = key
+    }
+    return this.restApiKey
   }
 
   async deployVoiceAgent() {
     try {
-      const response = await fetch(`${this.baseUrl}/deploy`, {
+      await this.promptForRestApiKey()
+      
+      const response = await fetch(`${this.deploymentBaseUrl}/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${this.restApiKey}`
         },
         body: JSON.stringify({
           model: 'voice-agent',
@@ -45,7 +60,7 @@ class CerebriumAPI {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${this.inferenceApiKey}`
         },
         body: JSON.stringify({
           room: roomName,
@@ -75,7 +90,7 @@ class CerebriumAPI {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'Authorization': `Bearer ${this.inferenceApiKey}`
         },
         body: JSON.stringify({
           command,

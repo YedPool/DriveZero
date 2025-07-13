@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 
-function MobileDashboard({ userEmail, onLogout }) {
+function MobileDashboard({ userEmail, onLogout, onOpenVoiceAssistant }) {
   const [emailData, setEmailData] = useState({
     primary: 42,
     updates: 15,
@@ -62,18 +62,8 @@ function MobileDashboard({ userEmail, onLogout }) {
   }
 
   const handleVoicePress = () => {
-    setIsListening(!isListening)
-    // Voice recognition will be implemented here
-    console.log('Voice button pressed, listening:', !isListening)
-    
-    if (!isListening) {
-      // Start listening
-      console.log('Starting voice recognition...')
-      // Web Speech API integration will go here
-    } else {
-      // Stop listening
-      console.log('Stopping voice recognition...')
-    }
+    // Navigate to the full voice assistant
+    onOpenVoiceAssistant()
   }
 
   return (
@@ -120,10 +110,7 @@ function MobileDashboard({ userEmail, onLogout }) {
       {/* Voice interface at bottom */}
       <div style={styles.voiceContainer}>
         <button 
-          style={{
-            ...styles.voiceButton,
-            ...(isListening ? styles.voiceButtonActive : {})
-          }}
+          style={styles.voiceButton}
           onClick={handleVoicePress}
         >
           <img src="/microphone-icon.png" alt="Microphone" style={styles.micImage} />
@@ -272,6 +259,11 @@ const styles = {
     background: 'rgba(239, 68, 68, 0.9)',
     transform: 'scale(1.1)',
     boxShadow: '0 12px 40px rgba(239, 68, 68, 0.5)'
+  },
+  micImage: {
+    width: '40px',
+    height: '40px',
+    filter: 'brightness(0) invert(1)' // Make icon white
   },
   statusWarning: {
     position: 'absolute',
