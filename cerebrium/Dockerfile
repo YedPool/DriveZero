@@ -1,18 +1,18 @@
 # Custom Ollama + Voice Agent Docker Image
 FROM ollama/ollama:latest
 
-# Install Python and system dependencies
+# Install Python and system dependencies  
 RUN apt-get update && apt-get install -y \
-    python3.11 \
+    python3 \
     python3-pip \
-    python3.11-venv \
+    python3-venv \
     curl \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Create symbolic links for python commands
-RUN ln -s /usr/bin/python3.11 /usr/bin/python
-RUN ln -s /usr/bin/pip3 /usr/bin/pip
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+RUN python3 -m pip install --upgrade pip
 
 # Set working directory
 WORKDIR /app
