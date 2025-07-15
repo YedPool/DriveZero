@@ -31,40 +31,40 @@ COPY main.py .
 COPY *.py .
 
 # Create startup script that runs both Ollama and our app
-RUN echo '#!/bin/bash' > /app/start.sh && \
-    echo 'set -e' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo 'echo "🚀 Starting Ollama + Voice Agent Container"' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Start Ollama in background' >> /app/start.sh && \
-    echo 'echo "📦 Starting Ollama server..."' >> /app/start.sh && \
-    echo 'ollama serve &' >> /app/start.sh && \
-    echo 'OLLAMA_PID=$!' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Wait for Ollama to be ready' >> /app/start.sh && \
-    echo 'echo "⏳ Waiting for Ollama to be ready..."' >> /app/start.sh && \
-    echo 'for i in {1..30}; do' >> /app/start.sh && \
-    echo '    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then' >> /app/start.sh && \
-    echo '        echo "✅ Ollama is ready!"' >> /app/start.sh && \
-    echo '        break' >> /app/start.sh && \
-    echo '    fi' >> /app/start.sh && \
-    echo '    echo "   Attempt $i/30 - waiting..."' >> /app/start.sh && \
-    echo '    sleep 2' >> /app/start.sh && \
-    echo 'done' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Download the model we need' >> /app/start.sh && \
-    echo 'echo "📥 Downloading llama3.2:1b model..."' >> /app/start.sh && \
-    echo 'ollama pull llama3.2:1b' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Start our voice agent' >> /app/start.sh && \
-    echo 'echo "🎤 Starting Voice Agent..."' >> /app/start.sh && \
-    echo 'python main.py' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Clean shutdown' >> /app/start.sh && \
-    echo 'trap '"'"'kill $OLLAMA_PID'"'"' EXIT' >> /app/start.sh && \
-    echo 'wait' >> /app/start.sh
+RUN /bin/bash -c "echo '#!/bin/bash' > /app/start.sh" && \
+    /bin/bash -c "echo 'set -e' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo 'echo \"🚀 Starting Ollama + Voice Agent Container\"' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo '# Start Ollama in background' >> /app/start.sh" && \
+    /bin/bash -c "echo 'echo \"📦 Starting Ollama server...\"' >> /app/start.sh" && \
+    /bin/bash -c "echo 'ollama serve &' >> /app/start.sh" && \
+    /bin/bash -c "echo 'OLLAMA_PID=\$!' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo '# Wait for Ollama to be ready' >> /app/start.sh" && \
+    /bin/bash -c "echo 'echo \"⏳ Waiting for Ollama to be ready...\"' >> /app/start.sh" && \
+    /bin/bash -c "echo 'for i in {1..30}; do' >> /app/start.sh" && \
+    /bin/bash -c "echo '    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then' >> /app/start.sh" && \
+    /bin/bash -c "echo '        echo \"✅ Ollama is ready!\"' >> /app/start.sh" && \
+    /bin/bash -c "echo '        break' >> /app/start.sh" && \
+    /bin/bash -c "echo '    fi' >> /app/start.sh" && \
+    /bin/bash -c "echo '    echo \"   Attempt \$i/30 - waiting...\"' >> /app/start.sh" && \
+    /bin/bash -c "echo '    sleep 2' >> /app/start.sh" && \
+    /bin/bash -c "echo 'done' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo '# Download the model we need' >> /app/start.sh" && \
+    /bin/bash -c "echo 'echo \"📥 Downloading llama3.2:1b model...\"' >> /app/start.sh" && \
+    /bin/bash -c "echo 'ollama pull llama3.2:1b' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo '# Start our voice agent' >> /app/start.sh" && \
+    /bin/bash -c "echo 'echo \"🎤 Starting Voice Agent...\"' >> /app/start.sh" && \
+    /bin/bash -c "echo 'python main.py' >> /app/start.sh" && \
+    /bin/bash -c "echo '' >> /app/start.sh" && \
+    /bin/bash -c "echo '# Clean shutdown' >> /app/start.sh" && \
+    /bin/bash -c "echo 'trap '\"'\"'kill \$OLLAMA_PID'\"'\"' EXIT' >> /app/start.sh" && \
+    /bin/bash -c "echo 'wait' >> /app/start.sh"
 
-RUN chmod +x /app/start.sh
+RUN /bin/bash -c "chmod +x /app/start.sh"
 
 # Expose ports
 EXPOSE 8600 11434
