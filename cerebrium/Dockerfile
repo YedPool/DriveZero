@@ -10,16 +10,21 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create symbolic links for python commands
-RUN ln -sf /usr/bin/python3 /usr/bin/python
-RUN python3 -m pip install --upgrade pip
+# Create virtual environment
+RUN python3 -m venv /app/venv
+
+# Activate virtual environment and upgrade pip
+RUN /app/venv/bin/pip install --upgrade pip
 
 # Set working directory
 WORKDIR /app
 
-# Copy Python requirements and install dependencies
+# Copy Python requirements and install dependencies in virtual environment
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Update PATH to use virtual environment
+ENV PATH="/app/venv/bin:$PATH"
 
 # Copy application code
 COPY main.py .
