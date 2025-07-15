@@ -26,40 +26,38 @@ COPY main.py .
 COPY *.py .
 
 # Create startup script that runs both Ollama and our app
-RUN cat > /app/start.sh << 'EOF'
-#!/bin/bash
-set -e
-
-echo "🚀 Starting Ollama + Voice Agent Container"
-
-# Start Ollama in background
-echo "📦 Starting Ollama server..."
-ollama serve &
-OLLAMA_PID=$!
-
-# Wait for Ollama to be ready
-echo "⏳ Waiting for Ollama to be ready..."
-for i in {1..30}; do
-    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-        echo "✅ Ollama is ready!"
-        break
-    fi
-    echo "   Attempt $i/30 - waiting..."
-    sleep 2
-done
-
-# Download the model we need
-echo "📥 Downloading llama3.2:1b model..."
-ollama pull llama3.2:1b
-
-# Start our voice agent
-echo "🎤 Starting Voice Agent..."
-python main.py
-
-# Clean shutdown
-trap 'kill $OLLAMA_PID' EXIT
-wait
-EOF
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'echo "🚀 Starting Ollama + Voice Agent Container"' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Start Ollama in background' >> /app/start.sh && \
+    echo 'echo "📦 Starting Ollama server..."' >> /app/start.sh && \
+    echo 'ollama serve &' >> /app/start.sh && \
+    echo 'OLLAMA_PID=$!' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Wait for Ollama to be ready' >> /app/start.sh && \
+    echo 'echo "⏳ Waiting for Ollama to be ready..."' >> /app/start.sh && \
+    echo 'for i in {1..30}; do' >> /app/start.sh && \
+    echo '    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then' >> /app/start.sh && \
+    echo '        echo "✅ Ollama is ready!"' >> /app/start.sh && \
+    echo '        break' >> /app/start.sh && \
+    echo '    fi' >> /app/start.sh && \
+    echo '    echo "   Attempt $i/30 - waiting..."' >> /app/start.sh && \
+    echo '    sleep 2' >> /app/start.sh && \
+    echo 'done' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Download the model we need' >> /app/start.sh && \
+    echo 'echo "📥 Downloading llama3.2:1b model..."' >> /app/start.sh && \
+    echo 'ollama pull llama3.2:1b' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Start our voice agent' >> /app/start.sh && \
+    echo 'echo "🎤 Starting Voice Agent..."' >> /app/start.sh && \
+    echo 'python main.py' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Clean shutdown' >> /app/start.sh && \
+    echo 'trap '"'"'kill $OLLAMA_PID'"'"' EXIT' >> /app/start.sh && \
+    echo 'wait' >> /app/start.sh
 
 RUN chmod +x /app/start.sh
 
