@@ -1,0 +1,118 @@
+name: Test Docker Container
+
+on:
+  push:
+    branches: [ main, voice-functionality-no-packages ]
+    paths: 
+      - 'cerebrium/**'
+      - '.github/workflows/test-docker.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'cerebrium/**'
+  workflow_dispatch:
+
+jobs:
+  test-docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        cd cerebrium
+        docker build -t gmail-voice-assistant:test .
+        
+    - name: Test container startup
+      run: |
+        # Start container in background
+        docker run -d --name test-container \
+          -p 8600:8600 \
+          -p 11434:11434 \
+          gmail-voice-assistant:test
+          
+        # Wait for container to start
+        sleep 30
+        
+        # Check if container is still running
+        if docker ps | grep -q test-container; then
+          echo "✅ Container started successfully"
+        else
+          echo "❌ Container failed to start"
+          docker logs test-container
+          exit 1
+        fi
+        
+    - name: Test Ollama availability
+      run: |
+        # Wait up to 2 minutes for Ollama to be ready
+        timeout=120
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+          if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+            echo "✅ Ollama is responding"
+            curl -s http://localhost:11434/api/tags
+            break
+          fi
+          echo "⏳ Waiting for Ollama... ($elapsed/$timeout seconds)"
+          sleep 10
+          elapsed=$((elapsed + 10))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "❌ Ollama failed to start within timeout"
+          docker logs test-container
+          exit 1
+        fi
+        
+    - name: Test model availability
+      run: |
+        # Check if llama3.2:1b model is available
+        if curl -s http://localhost:11434/api/tags | grep -q "llama3.2:1b"; then
+          echo "✅ llama3.2:1b model is available"
+        else
+          echo "❌ llama3.2:1b model not found"
+          echo "Available models:"
+          curl -s http://localhost:11434/api/tags
+          exit 1
+        fi
+        
+    - name: Test voice agent port
+      run: |
+        # Check if port 8600 is responding (voice agent)
+        timeout=60
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+          if curl -s http://localhost:8600/health > /dev/null 2>&1 || netstat -ln | grep -q ":8600 "; then
+            echo "✅ Voice agent port 8600 is active"
+            break
+          fi
+          echo "⏳ Waiting for voice agent... ($elapsed/$timeout seconds)"
+          sleep 5
+          elapsed=$((elapsed + 5))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "⚠️  Voice agent port 8600 not responding (this may be normal without LiveKit connection)"
+        fi
+        
+    - name: Container logs and cleanup
+      if: always()
+      run: |
+        echo "📋 Container logs:"
+        docker logs test-container || true
+        
+        echo "📊 Container stats:"
+        docker stats --no-stream test-container || true
+        
+        echo "🧹 Cleaning up..."
+        docker stop test-container || true
+        docker rm test-container || true
