@@ -2,7 +2,20 @@ class CerebriumAPI {
   constructor() {
     this.inferenceApiKey = import.meta.env.VITE_CEREBRIUM_API_KEY
     this.restApiKey = import.meta.env.VITE_CEREBRIUM_REST_API_KEY
-    this.baseUrl = import.meta.env.VITE_VOICE_AGENT_URL || 'https://api.cerebrium.ai'
+    this.projectId = import.meta.env.VITE_CEREBRIUM_PROJECT_ID
+    
+    // Service discovery: Build URLs from project ID or use explicit URLs
+    if (this.projectId) {
+      this.tokenServerUrl = `https://api.aws.us-east-1.cerebrium.ai/v4/p-${this.projectId}/gmail-token-server`
+      this.voiceAgentUrl = `https://api.aws.us-east-1.cerebrium.ai/v4/p-${this.projectId}/gmail-voice-assistant-allinone`
+      console.log('Using Cerebrium service discovery:', { tokenServerUrl: this.tokenServerUrl, voiceAgentUrl: this.voiceAgentUrl })
+    } else {
+      // Fallback: Use explicit URLs
+      this.tokenServerUrl = import.meta.env.VITE_TOKEN_SERVER_URL || 'https://api.cerebrium.ai'
+      this.voiceAgentUrl = import.meta.env.VITE_VOICE_AGENT_URL || 'https://api.cerebrium.ai'
+      console.warn('VITE_CEREBRIUM_PROJECT_ID not set, using fallback URLs')
+    }
+    
     this.deploymentBaseUrl = 'https://api.cerebrium.ai'
   }
 
@@ -56,11 +69,10 @@ class CerebriumAPI {
 
   async getLiveKitToken(roomName, identity) {
     try {
-      const response = await fetch(`${this.baseUrl}/token`, {
+      const response = await fetch(`${this.tokenServerUrl}/token`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.inferenceApiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           room: roomName,
@@ -86,7 +98,7 @@ class CerebriumAPI {
 
   async processEmailCommand(command, userEmail) {
     try {
-      const response = await fetch(`${this.baseUrl}/email-command`, {
+      const response = await fetch(`${this.voiceAgentUrl}/email-command`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

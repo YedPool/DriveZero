@@ -18,28 +18,27 @@ cooldown = 120
 dockerfile = false
 python_packages = "./requirements.txt"
 include = [".", "*.py"]
-
-[cerebrium.predict]
-python_version = "3.11"
-gpu_count = 1
-setup_commands = [
-    "apt-get update && apt-get install -y curl wget",
-    "curl -fsSL https://ollama.ai/install.sh | sh"
+# Install system dependencies then download models
+shell_commands = [
+    "apt-get update && apt-get install -y curl",
+    "curl -fsSL https://ollama.com/install.sh | sh",
+    "python main.py download-files"
 ]
 
-# Main entry point
-[cerebrium.app]
-main = "main.py"
+# Custom Runtime Configuration - LiveKit Agent Worker
+[cerebrium.runtime.custom]
+port = 8600
+entrypoint = ["python", "main.py", "dev"]
 
 [cerebrium.env]
-# Required API Keys (All-in-One Deployment)
+# Required API Keys (All-in-One Deployment) - Set these via Cerebrium dashboard
 # DEEPGRAM_API_KEY = "your-deepgram-key"    # For Nova-2 STT + Rime TTS
 # OPENAI_API_KEY = "your-openai-key"        # For GPT-4o-mini LLM
 
-# Internal service configuration (auto-configured)
-LIVEKIT_URL = "ws://localhost:7880"
-LIVEKIT_API_KEY = "devkey"
-LIVEKIT_API_SECRET = "secret"
+# LiveKit Configuration - Set these via Cerebrium dashboard secrets
+# LIVEKIT_URL = "wss://your-livekit-server"
+# LIVEKIT_API_KEY = "your-livekit-api-key"
+# LIVEKIT_API_SECRET = "your-livekit-api-secret"
 
 # External access ports
 LIVEKIT_EXTERNAL_PORT = "7880"

@@ -1,0 +1,31 @@
+[cerebrium.deployment]
+name = "gmail-livekit-server"
+python_version = "3.11"
+include = ["."]
+exclude = ["__pycache__", "*.pyc", ".git"]
+
+[cerebrium.hardware]
+cpu = 2.0
+memory = 8.0
+compute = "CPU"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 2
+cooldown = 120
+
+[cerebrium.build]
+dockerfile = false
+python_packages = "./requirements.txt"
+include = [".", "*.py"]
+
+# Custom Runtime Configuration - LiveKit Server
+[cerebrium.runtime.custom]
+port = 7880
+entrypoint = ["python", "main.py"]
+
+[cerebrium.env]
+# LiveKit Server Configuration
+LIVEKIT_PORT = "7880"
+# LIVEKIT_API_KEY = "devkey"  # Set via Cerebrium dashboard secrets
+# LIVEKIT_API_SECRET = "secret"  # Set via Cerebrium dashboard secrets

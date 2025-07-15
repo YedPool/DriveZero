@@ -1,254 +1,238 @@
 #!/usr/bin/env python3
 """
-Main orchestrator for the all-in-one Cerebrium voice agent deployment.
-Manages LiveKit server, Ollama, and voice agent on the same infrastructure.
+LiveKit Agent for Gmail voice assistant following Cerebrium GitHub example.
 """
 
 import os
-import asyncio
-import logging
-import signal
 import sys
-import json
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uvicorn
+import logging
+import subprocess
+import time
+import asyncio
+from dotenv import load_dotenv
 
-from livekit_server import start_livekit_server
+from livekit import agents
+from livekit.agents import AgentSession, Agent, cli, WorkerOptions, WorkerType
+from livekit.plugins import openai, deepgram, silero
+from livekit.plugins.turn_detector.english import EnglishModel
+from livekit.agents import metrics, MetricsCollectedEvent
 
+# Load environment variables
+load_dotenv()
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app for token endpoints
-app = FastAPI()
+# Usage metrics collector
+usage_collector = metrics.UsageCollector()
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Set cache directory for models
+os.environ["HF_HOME"] = "/cortex/.cache/"
 
-class TokenRequest(BaseModel):
-    room: str
-    identity: str
-    permissions: dict
-
-@app.post("/token")
-async def get_livekit_token(request: TokenRequest):
-    """Generate LiveKit access token for frontend connection."""
+def setup_ollama():
+    """Start Ollama service (binary installed during build)."""
     try:
-        # Import livekit tokens inside function to avoid threading issues
-        from livekit import api
+        logger.info("Starting Ollama service...")
         
-        # Use our internal LiveKit configuration
-        token = api.AccessToken(
-            api_key=os.getenv("LIVEKIT_API_KEY", "devkey"),
-            api_secret=os.getenv("LIVEKIT_API_SECRET", "secret")
+        # Start Ollama service in background (binary pre-installed)
+        ollama_process = subprocess.Popen(
+            ["ollama", "serve"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
         
-        # Set participant identity and room
-        token.identity = request.identity
-        token.name = request.identity
-        
-        # Add permissions
-        grant = api.VideoGrant(
-            room_join=True,
-            room=request.room,
-            can_publish=request.permissions.get("canPublish", True),
-            can_subscribe=request.permissions.get("canSubscribe", True)
-        )
-        token.add_grant(grant)
-        
-        # Generate JWT token
-        jwt_token = token.to_jwt()
-        
-        return {
-            "token": jwt_token,
-            "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880")
-        }
+        logger.info("✓ Ollama service started")
+        return ollama_process
         
     except Exception as e:
-        logger.error(f"Failed to generate token: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start Ollama: {e}")
+        return None
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "voice-agent"}
-
-class VoiceAgentOrchestrator:
-    def __init__(self):
-        self.ollama_process = None
-        self.livekit_server = None
-        self.voice_agent_task = None
-        
-    async def start_all_services(self):
-        """Start all services in the correct order."""
+def wait_for_ollama():
+    """Wait for Ollama to be ready."""
+    max_attempts = 30
+    for attempt in range(max_attempts):
         try:
-            logger.info("Starting All-in-One Voice Agent Deployment")
-            
-            # 1. Skip Ollama for now (using OpenAI GPT instead)
-            logger.info("Using OpenAI GPT (skipping Ollama setup)...")
-            
-            # 2. Start LiveKit server
-            logger.info("Starting LiveKit server...")
-            self.livekit_server = await start_livekit_server()
-            await asyncio.sleep(5)  # Wait for LiveKit to be ready
-            
-            # 3. Set internal URLs for voice agent
-            os.environ["LIVEKIT_URL"] = "ws://localhost:7880"
-            
-            # 4. Start voice agent
-            logger.info("Starting Voice Agent...")
-            await self.start_voice_agent()
-            
-            logger.info("All services started successfully!")
-            logger.info("Service URLs:")
-            logger.info("   - LiveKit WebSocket: ws://localhost:7880")
-            logger.info("   - Voice Agent: Running")
-            logger.info("   - LLM: OpenAI GPT-4o-mini")
-            
-        except Exception as e:
-            logger.error(f"Failed to start services: {e}")
-            await self.shutdown()
-            raise
-    
-    async def start_voice_agent(self):
-        """Start the LiveKit voice agent."""
-        try:
-            # Create a task for the voice agent
-            self.voice_agent_task = asyncio.create_task(
-                self.run_voice_agent()
+            result = subprocess.run(
+                ["curl", "-s", "http://127.0.0.1:11434/api/tags"],
+                capture_output=True,
+                text=True,
+                timeout=5
             )
-            await asyncio.sleep(2)  # Let it initialize
-            
-        except Exception as e:
-            logger.error(f"Failed to start voice agent: {e}")
-            raise
+            if result.returncode == 0:
+                logger.info("✓ Ollama is ready")
+                return True
+        except:
+            pass
+        
+        logger.info(f"Waiting for Ollama... ({attempt + 1}/{max_attempts})")
+        time.sleep(2)
     
-    async def run_voice_agent(self):
-        """Run the voice agent using LiveKit CLI."""
-        try:
-            # Import voice agent components inside function to avoid threading issues
-            from voice_agent import cli, WorkerOptions, entrypoint
-            
-            # Run the voice agent
-            cli.run_app(
-                WorkerOptions(
-                    entrypoint_fnc=entrypoint,
-                    prewarm_fnc=None,
-                ),
-            )
-        except Exception as e:
-            logger.error(f"Voice agent error: {e}")
-            raise
+    logger.error("✗ Ollama failed to start within timeout")
+    return False
+
+class GmailAssistant(Agent):
+    def __init__(self) -> None:
+        super().__init__(instructions="You are a helpful Gmail voice assistant. Help users manage their emails, compose messages, and organize their inbox.")
+
+def get_livekit_connection_url():
+    """Service discovery for LiveKit server connection."""
+    cerebrium_project_id = os.getenv("CEREBRIUM_PROJECT_ID")
+    livekit_deployment_name = os.getenv("LIVEKIT_DEPLOYMENT_NAME", "gmail-livekit-server")
     
-    async def health_check(self):
-        """Check health of all services."""
-        health = {
-            "ollama": False,
-            "livekit": False,
-            "voice_agent": False
-        }
-        
-        try:
-            # Check Ollama
-            if self.ollama_process and self.ollama_process.poll() is None:
-                health["ollama"] = True
-            
-            # Check LiveKit
-            if self.livekit_server and self.livekit_server.process and self.livekit_server.process.poll() is None:
-                health["livekit"] = True
-            
-            # Check Voice Agent
-            if self.voice_agent_task and not self.voice_agent_task.done():
-                health["voice_agent"] = True
-                
-        except Exception as e:
-            logger.error(f"Health check error: {e}")
-        
-        return health
+    if cerebrium_project_id:
+        # Production: Use Cerebrium service URL  
+        url = f"wss://api.aws.us-east-1.cerebrium.ai/v4/p-{cerebrium_project_id}/{livekit_deployment_name}:7880"
+        logger.info(f"Agent connecting to Cerebrium LiveKit: {url}")
+        return url
+    else:
+        # Fallback: Use explicit LIVEKIT_URL or development default
+        url = os.getenv("LIVEKIT_URL", "ws://localhost:7880")
+        logger.warning(f"CEREBRIUM_PROJECT_ID not set, using fallback: {url}")
+        return url
+
+async def entrypoint(ctx: agents.JobContext):
+    """
+    Main entrypoint for the LiveKit agent.
+    This function is called when a participant joins a room.
+    """
+    # Log service discovery information
+    livekit_url = get_livekit_connection_url()
+    logger.info(f"Agent starting with LiveKit URL: {livekit_url}")
     
-    async def shutdown(self):
-        """Gracefully shutdown all services."""
-        logger.info("Shutting down all services...")
+    await ctx.connect()
+    
+    # Configure the agent session with required services
+    session = AgentSession(
+        # Speech-to-Text: Deepgram Nova-2
+        stt=deepgram.STT(
+            model="nova-2",
+            language="en-US",
+            smart_format=True,
+            profanity_filter=False,
+            punctuate=True,
+        ),
         
-        # Stop voice agent
-        if self.voice_agent_task:
-            self.voice_agent_task.cancel()
-            try:
-                await self.voice_agent_task
-            except asyncio.CancelledError:
-                pass
+        # Large Language Model: Local Ollama
+        llm=openai.LLM(
+            base_url="http://127.0.0.1:11434/v1",
+            api_key="ollama",  # Ollama doesn't need real API key
+            model="llama3.2:1b",
+            temperature=0.7,
+        ),
         
-        # Stop LiveKit server
-        if self.livekit_server:
-            self.livekit_server.stop()
+        # Text-to-Speech: Deepgram Rime
+        tts=deepgram.TTS(
+            model="aura-asteria-en",
+            encoding="linear16",
+            sample_rate=24000,
+        ),
         
-        # Stop Ollama
-        if self.ollama_process:
-            self.ollama_process.terminate()
-            self.ollama_process.wait()
+        # Voice Activity Detection
+        vad=silero.VAD.load(),
         
-        logger.info("All services shut down")
-
-# Global orchestrator instance
-orchestrator = VoiceAgentOrchestrator()
-
-def signal_handler(signum, frame):
-    """Handle shutdown signals."""
-    logger.info("Received shutdown signal")
-    asyncio.create_task(orchestrator.shutdown())
-    sys.exit(0)
-
-async def start_api_server():
-    """Start the FastAPI server for token endpoints."""
-    config = uvicorn.Config(
-        app, 
-        host="0.0.0.0", 
-        port=8000, 
-        log_level="info"
+        # Turn detection for natural conversation flow
+        turn_detection=EnglishModel(),
     )
-    server = uvicorn.Server(config)
-    await server.serve()
+    
+    # Start the agent session
+    await session.start(
+        room=ctx.room,
+        agent=GmailAssistant(),
+    )
+    
+    # Generate initial greeting when agent joins
+    await session.generate_reply(
+        instructions="Greet the user warmly and ask how you can help them with their Gmail today."
+    )
+    
+    # Metrics collection for usage tracking
+    @session.on("metrics_collected")
+    def _on_metrics_collected(ev: MetricsCollectedEvent):
+        usage_collector.collect(ev.metrics)
+        metrics.log_metrics(ev.metrics)
+    
+    async def log_usage():
+        """Log usage summary when session ends"""
+        summary = usage_collector.get_summary()
+        print(f"Usage: {summary}")
+    
+    # Register cleanup callback
+    ctx.add_shutdown_callback(log_usage)
 
-async def main():
-    """Main entry point."""
-    try:
-        # Register signal handlers
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # Start FastAPI server and voice services concurrently
-        api_task = asyncio.create_task(start_api_server())
-        
-        # Start all voice services
-        await orchestrator.start_all_services()
-        
-        # Keep running and monitor health
-        while True:
-            health = await orchestrator.health_check()
-            logger.info(f"Health: {health}")
+if __name__ == '__main__':
+    # Add 'dev' as default argument if none provided (following GitHub example)
+    if len(sys.argv) == 1:
+        sys.argv.append('dev')
+    
+    # Check for download command
+    if len(sys.argv) > 1 and sys.argv[1] == 'download-files':
+        # Download required models during build phase
+        logger.info("Downloading required models...")
+        try:
+            # Download LiveKit models
+            from livekit.plugins.turn_detector.english import EnglishModel
+            model = EnglishModel()
+            logger.info("✓ LiveKit models downloaded successfully")
+        except Exception as e:
+            logger.warning(f"LiveKit model download failed: {e}")
             
-            # Restart failed services if needed
-            if not all(health.values()):
-                logger.warning("Some services are down, attempting restart...")
-                await orchestrator.shutdown()
-                await asyncio.sleep(5)
-                await orchestrator.start_all_services()
+        # Download Ollama models during build
+        try:
+            logger.info("Starting Ollama and downloading models...")
             
-            await asyncio.sleep(30)  # Health check every 30 seconds
+            # Start Ollama in background
+            ollama_proc = subprocess.Popen(["ollama", "serve"])
+            time.sleep(10)  # Wait for startup
             
-    except KeyboardInterrupt:
-        await orchestrator.shutdown()
-    except Exception as e:
-        logger.error(f"Main error: {e}")
-        await orchestrator.shutdown()
-        raise
-
-if __name__ == "__main__":
-    asyncio.run(main())
+            # Pull small model
+            logger.info("Pulling llama3.2:1b model...")
+            result = subprocess.run(["ollama", "pull", "llama3.2:1b"], timeout=600)
+            
+            if result.returncode == 0:
+                logger.info("✓ Ollama model downloaded successfully")
+            else:
+                logger.warning("Ollama model download failed, will retry at runtime")
+                
+            # Stop Ollama
+            ollama_proc.terminate()
+            
+        except Exception as e:
+            logger.warning(f"Ollama setup during build failed: {e}")
+            
+        logger.info("✓ Build phase complete")
+        
+    else:
+        # Start Ollama service first
+        logger.info("🚀 Starting Gmail Voice Assistant Agent...")
+        logger.info("Setting up Ollama...")
+        
+        ollama_process = setup_ollama()
+        
+        if ollama_process and wait_for_ollama():
+            logger.info("✓ Ollama is ready, starting LiveKit agent worker")
+        else:
+            logger.error("❌ Ollama setup failed - agent cannot function without LLM")
+            logger.error("Please check Ollama installation and model availability")
+            # Don't start agent if Ollama failed - it will definitely fail
+            sys.exit(1)
+        
+        # Start the LiveKit agent worker
+        logger.info("Starting LiveKit agent worker on port 8600...")
+        try:
+            cli.run_app(WorkerOptions(
+                entrypoint_fnc=entrypoint,
+                worker_type=WorkerType.ROOM,
+                port=8600
+            ))
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            if ollama_process:
+                ollama_process.terminate()
+        except Exception as e:
+            logger.error(f"Agent failed: {e}")
+            if ollama_process:
+                ollama_process.terminate()
+            raise

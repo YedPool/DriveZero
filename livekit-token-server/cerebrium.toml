@@ -1,0 +1,32 @@
+[cerebrium.deployment]
+name = "gmail-token-server"
+python_version = "3.11"
+include = ["."]
+exclude = ["__pycache__", "*.pyc", ".git"]
+
+[cerebrium.hardware]
+cpu = 1.0
+memory = 4.0
+compute = "CPU"
+
+[cerebrium.scaling]
+min_replicas = 1
+max_replicas = 5
+cooldown = 60
+
+[cerebrium.build]
+dockerfile = false
+python_packages = "./requirements.txt"
+include = [".", "*.py"]
+
+# Custom Runtime Configuration - FastAPI Token Server
+[cerebrium.runtime.custom]
+port = 8000
+entrypoint = ["python", "main.py"]
+healthcheck_endpoint = "/health"
+
+[cerebrium.env]
+# LiveKit Configuration - Set these via Cerebrium dashboard
+# LIVEKIT_URL = "ws://localhost:7880"  # Points to your LiveKit server
+# LIVEKIT_API_KEY = "devkey"
+# LIVEKIT_API_SECRET = "secret"

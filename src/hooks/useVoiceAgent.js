@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Room, RoomEvent, Track } from 'livekit-client'
+import cerebriumApi from '../services/cerebriumApi'
 
 export const useVoiceAgent = () => {
   const [isConnected, setIsConnected] = useState(false)
@@ -12,8 +13,17 @@ export const useVoiceAgent = () => {
     try {
       setError(null)
       
-      // For now, simulate connection since our token endpoint is still deploying
-      console.log('Simulating voice assistant connection...')
+      // Get LiveKit connection info from the token server
+      console.log('Getting LiveKit token from token server...')
+      
+      const roomName = 'voice-assistant-room'
+      const identity = `user-${Date.now()}`
+      
+      const response = await cerebriumApi.getLiveKitToken(roomName, identity)
+      console.log('Received token response:', response)
+      
+      const { token, url } = response
+      console.log('Received LiveKit token, connecting to:', url)
       
       const room = new Room({
         adaptiveStream: true,
@@ -50,11 +60,8 @@ export const useVoiceAgent = () => {
         console.log('Local track published:', publication.kind)
       })
       
-      // Simulate successful connection for now
-      setTimeout(() => {
-        setIsConnected(true)
-        addMessage('system', 'Voice assistant ready! (Waiting for Cerebrium deployment)')
-      }, 1000)
+      // Connect using token and URL from our deployed voice agent
+      await room.connect(url, token)
       
     } catch (err) {
       console.error('Failed to connect to voice agent:', err)
@@ -100,23 +107,14 @@ export const useVoiceAgent = () => {
   }, [isConnected])
 
   const stopRecording = useCallback(async () => {
+    if (!roomRef.current) return
+
     try {
-      // Simulate stopping recording
-      if (roomRef.current && roomRef.current.localParticipant) {
-        // Real LiveKit connection
-        await roomRef.current.localParticipant.enableMicrophone(false)
-      } else {
-        // Simulation mode
-        console.log('Simulating stop recording...')
-      }
-      
+      // Disable microphone
+      await roomRef.current.localParticipant.enableMicrophone(false)
       setIsRecording(false)
-      addMessage('system', 'Processing...')
       
-      // Simulate AI response after a delay
-      setTimeout(() => {
-        addMessage('ai', 'Hello! I\'m your voice assistant. I can help you manage your Gmail emails. What would you like me to do? (Note: This is a demo response while the voice agent deploys)')
-      }, 1500)
+      addMessage('system', 'Processing...')
       
     } catch (err) {
       console.error('Failed to stop recording:', err)
