@@ -15,15 +15,8 @@ max_replicas = 3
 cooldown = 120
 
 [cerebrium.build]
-dockerfile = false
-python_packages = "./requirements.txt"
-include = [".", "*.py"]
-# Install system dependencies then download models
-shell_commands = [
-    "apt-get update && apt-get install -y curl",
-    "curl -fsSL https://ollama.com/install.sh | sh",
-    "python main.py download-files"
-]
+dockerfile = "./Dockerfile"
+include = [".", "*.py", "requirements.txt", "Dockerfile"]
 
 # Custom Runtime Configuration - LiveKit Agent Worker
 [cerebrium.runtime.custom]

@@ -30,29 +30,9 @@ usage_collector = metrics.UsageCollector()
 # Set cache directory for models
 os.environ["HF_HOME"] = "/cortex/.cache/"
 
-def setup_ollama():
-    """Start Ollama service (binary installed during build)."""
-    try:
-        logger.info("Starting Ollama service...")
-        
-        # Start Ollama service in background (binary pre-installed)
-        ollama_process = subprocess.Popen(
-            ["ollama", "serve"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
-        logger.info("✓ Ollama service started")
-        return ollama_process
-        
-    except Exception as e:
-        logger.error(f"Failed to start Ollama: {e}")
-        return None
-
-def wait_for_ollama():
-    """Wait for Ollama to be ready."""
-    max_attempts = 30
+def check_ollama_ready():
+    """Check if Ollama is ready (should be started by Docker container)."""
+    max_attempts = 10
     for attempt in range(max_attempts):
         try:
             result = subprocess.run(
@@ -70,7 +50,7 @@ def wait_for_ollama():
         logger.info(f"Waiting for Ollama... ({attempt + 1}/{max_attempts})")
         time.sleep(2)
     
-    logger.error("✗ Ollama failed to start within timeout")
+    logger.error("✗ Ollama not available")
     return False
 
 class GmailAssistant(Agent):
@@ -205,18 +185,16 @@ if __name__ == '__main__':
         logger.info("✓ Build phase complete")
         
     else:
-        # Start Ollama service first
+        # Check if Ollama is ready (should be started by Docker container)
         logger.info("🚀 Starting Gmail Voice Assistant Agent...")
-        logger.info("Setting up Ollama...")
+        logger.info("Checking Ollama availability...")
         
-        ollama_process = setup_ollama()
-        
-        if ollama_process and wait_for_ollama():
-            logger.info("✓ Ollama is ready, starting LiveKit agent worker")
+        if check_ollama_ready():
+            logger.info("✓ Ollama is available, starting LiveKit agent worker")
         else:
-            logger.error("❌ Ollama setup failed - agent cannot function without LLM")
-            logger.error("Please check Ollama installation and model availability")
-            # Don't start agent if Ollama failed - it will definitely fail
+            logger.error("❌ Ollama not available - agent cannot function without LLM")
+            logger.error("Make sure Ollama is running in the Docker container")
+            # Don't start agent if Ollama not available - it will definitely fail
             sys.exit(1)
         
         # Start the LiveKit agent worker
@@ -229,10 +207,6 @@ if __name__ == '__main__':
             ))
         except KeyboardInterrupt:
             logger.info("Shutting down...")
-            if ollama_process:
-                ollama_process.terminate()
         except Exception as e:
             logger.error(f"Agent failed: {e}")
-            if ollama_process:
-                ollama_process.terminate()
             raise
