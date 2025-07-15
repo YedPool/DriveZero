@@ -74,4 +74,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:11434/api/tags || exit 1
 
 # Start both services
-CMD ["/app/start.sh"]
+CMD ["/bin/bash", "/app/start.sh"]
