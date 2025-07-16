@@ -69,7 +69,6 @@ log_level: info
 
 room:
   auto_create: true
-  enable_recording: false
 
 turn:
   enabled: false
