@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-docker-build:
+  test-ollama-container:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     
@@ -116,3 +116,73 @@ jobs:
         echo "🧹 Cleaning up..."
         docker stop test-container || true
         docker rm test-container || true
+
+  test-livekit-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build LiveKit Docker image
+      run: |
+        cd livekit-server
+        docker build -t livekit-server:test .
+        
+    - name: Test LiveKit container startup
+      run: |
+        # Start container in background with required environment variables
+        docker run -d --name livekit-test \
+          -p 7880:7880 \
+          -p 7881:7881 \
+          -e LIVEKIT_API_KEY=testkey \
+          -e LIVEKIT_API_SECRET=testsecret \
+          livekit-server:test
+          
+        # Wait for container to start
+        sleep 15
+        
+        # Check if container is still running
+        if docker ps | grep -q livekit-test; then
+          echo "✅ LiveKit container started successfully"
+        else
+          echo "❌ LiveKit container failed to start"
+          docker logs livekit-test
+          exit 1
+        fi
+        
+    - name: Test LiveKit server health
+      run: |
+        # Wait up to 1 minute for LiveKit to be ready
+        timeout=60
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+          if curl -s http://localhost:7880/ > /dev/null 2>&1; then
+            echo "✅ LiveKit server is responding"
+            break
+          fi
+          echo "⏳ Waiting for LiveKit server... ($elapsed/$timeout seconds)"
+          sleep 5
+          elapsed=$((elapsed + 5))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "❌ LiveKit server failed to start within timeout"
+          docker logs livekit-test
+          exit 1
+        fi
+        
+    - name: LiveKit logs and cleanup
+      if: always()
+      run: |
+        echo "📋 LiveKit container logs:"
+        docker logs livekit-test || true
+        
+        echo "🧹 Cleaning up..."
+        docker stop livekit-test || true
+        docker rm livekit-test || true
