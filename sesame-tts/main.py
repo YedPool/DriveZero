@@ -75,12 +75,24 @@ class TTSServer:
             model_id = "sesame/csm-1b"
             logger.info(f"Loading Sesame CSM model: {model_id}")
             
+            # Check for HuggingFace token
+            hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
+            if not hf_token:
+                logger.warning("No HUGGINGFACE_HUB_TOKEN environment variable found")
+                logger.warning("You may need to accept the model license and set your HF token")
+            else:
+                logger.info("✓ HuggingFace token found")
+            
             # Load processor and model
-            self.processor = AutoProcessor.from_pretrained(model_id)
+            self.processor = AutoProcessor.from_pretrained(
+                model_id,
+                token=hf_token
+            )
             self.model = CsmForConditionalGeneration.from_pretrained(
                 model_id,
                 device_map=self.device,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                token=hf_token
             )
             
             logger.info("✓ Sesame CSM model loaded successfully")
@@ -88,6 +100,9 @@ class TTSServer:
             
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
+            logger.error("Make sure you have:")
+            logger.error("1. Accepted the license at https://huggingface.co/sesame/csm-1b")
+            logger.error("2. Set HUGGINGFACE_HUB_TOKEN environment variable")
             return False
     
     def generate_audio(self, text: str, speaker: int = 0, max_audio_length_ms: int = 10000):

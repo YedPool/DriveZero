@@ -365,12 +365,21 @@ jobs:
           exit 1
         fi
         
-    - name: Test Sesame TTS container startup (without model loading)
+    - name: Test Sesame TTS container startup
       run: |
-        # Start Sesame TTS container (will fail without HF token but should start server)
-        docker run -d --name sesame-tts-test \
-          -p 8001:8001 \
-          sesame-tts:test
+        # Start Sesame TTS container with HuggingFace token if available
+        if [ -n "${{ secrets.HUGGINGFACE_TOKEN }}" ]; then
+          echo "🔑 Using HuggingFace token for model access"
+          docker run -d --name sesame-tts-test \
+            -p 8001:8001 \
+            -e HUGGINGFACE_HUB_TOKEN=${{ secrets.HUGGINGFACE_TOKEN }} \
+            sesame-tts:test
+        else
+          echo "⚠️ No HuggingFace token available - testing container startup only"
+          docker run -d --name sesame-tts-test \
+            -p 8001:8001 \
+            sesame-tts:test
+        fi
           
         # Show immediate logs
         echo "📋 Initial Sesame TTS logs:"
