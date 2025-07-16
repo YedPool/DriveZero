@@ -160,8 +160,32 @@ development: true
             # Create config file
             self.create_config()
             
-            # Download server if not exists
-            if not os.path.exists("/usr/local/bin/livekit-server"):
+            # Check if server exists and get detailed info
+            binary_path = "/usr/local/bin/livekit-server"
+            if os.path.exists(binary_path):
+                logger.info("✓ LiveKit server binary found")
+                stat_info = os.stat(binary_path)
+                logger.info(f"  Size: {stat_info.st_size} bytes")
+                logger.info(f"  Mode: {oct(stat_info.st_mode)}")
+                
+                # Check file type
+                try:
+                    import subprocess
+                    result = subprocess.run(['file', binary_path], capture_output=True, text=True)
+                    logger.info(f"  File type: {result.stdout.strip()}")
+                except Exception as e:
+                    logger.info(f"  Could not determine file type: {e}")
+                
+                # Test if it's executable by trying to run it with --help
+                try:
+                    result = subprocess.run([binary_path, '--help'], 
+                                          capture_output=True, text=True, timeout=5)
+                    logger.info(f"  Binary test exit code: {result.returncode}")
+                    if result.stdout:
+                        logger.info(f"  Binary help output: {result.stdout[:200]}...")
+                except Exception as e:
+                    logger.error(f"  Binary test failed: {e}")
+            else:
                 logger.info("LiveKit server not found, downloading...")
                 self.download_livekit_server()
             
