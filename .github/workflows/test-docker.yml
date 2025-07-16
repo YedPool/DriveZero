@@ -136,7 +136,7 @@ jobs:
     - name: Build LiveKit Docker image
       run: |
         cd livekit-server
-        docker build --progress=plain -t livekit-server:test .
+        docker build --progress=plain --no-cache -t livekit-server:test .
         
     - name: Test LiveKit container startup
       run: |
