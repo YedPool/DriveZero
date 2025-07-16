@@ -296,3 +296,113 @@ jobs:
         echo "🧹 Cleaning up..."
         docker stop token-server-test || true
         docker rm token-server-test || true
+
+  test-speech-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Whisper STT Docker image
+      run: |
+        cd whisper-stt
+        docker build --progress=plain -t whisper-stt:test .
+        
+    - name: Build Sesame TTS Docker image
+      run: |
+        cd sesame-tts
+        docker build --progress=plain -t sesame-tts:test .
+        
+    - name: Test Whisper STT container startup
+      run: |
+        # Start Whisper STT container
+        docker run -d --name whisper-stt-test \
+          -p 8002:8002 \
+          -e WHISPER_MODEL=tiny \
+          whisper-stt:test
+          
+        # Show immediate logs
+        echo "📋 Initial Whisper STT logs:"
+        docker logs whisper-stt-test || true
+          
+        # Wait for container to start
+        sleep 30
+        
+        # Check if container is still running
+        if docker ps | grep -q whisper-stt-test; then
+          echo "✅ Whisper STT container started successfully"
+        else
+          echo "❌ Whisper STT container failed to start"
+          docker logs whisper-stt-test
+          exit 1
+        fi
+        
+    - name: Test Whisper STT health endpoint
+      run: |
+        # Wait up to 60 seconds for STT server to be ready
+        timeout=60
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+          if curl -s http://localhost:8002/health > /dev/null 2>&1; then
+            echo "✅ Whisper STT health endpoint responding"
+            curl -s http://localhost:8002/health | jq .
+            break
+          fi
+          echo "⏳ Waiting for Whisper STT... ($elapsed/$timeout seconds)"
+          sleep 5
+          elapsed=$((elapsed + 5))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "❌ Whisper STT health endpoint failed to respond"
+          docker logs whisper-stt-test
+          exit 1
+        fi
+        
+    - name: Test Sesame TTS container startup (without model loading)
+      run: |
+        # Start Sesame TTS container (will fail without HF token but should start server)
+        docker run -d --name sesame-tts-test \
+          -p 8001:8001 \
+          sesame-tts:test
+          
+        # Show immediate logs
+        echo "📋 Initial Sesame TTS logs:"
+        docker logs sesame-tts-test || true
+          
+        # Wait for container
+        sleep 20
+        
+        # Check container status (it may exit due to missing HF token, that's expected)
+        echo "📊 Sesame TTS container status:"
+        docker ps -a | grep sesame-tts-test || true
+        
+        echo "📋 Full Sesame TTS logs:"
+        docker logs sesame-tts-test || true
+        
+    - name: Test service endpoints info
+      run: |
+        echo "🔍 Testing Whisper STT root endpoint..."
+        curl -s http://localhost:8002/ | jq . || true
+        
+        echo "📊 Container resource usage:"
+        docker stats --no-stream whisper-stt-test || true
+        
+    - name: Speech services logs and cleanup
+      if: always()
+      run: |
+        echo "📋 Whisper STT final logs:"
+        docker logs whisper-stt-test || true
+        
+        echo "📋 Sesame TTS final logs:"
+        docker logs sesame-tts-test || true
+        
+        echo "🧹 Cleaning up..."
+        docker stop whisper-stt-test sesame-tts-test || true
+        docker rm whisper-stt-test sesame-tts-test || true
