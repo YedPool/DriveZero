@@ -133,7 +133,7 @@ jobs:
     - name: Build LiveKit Docker image
       run: |
         cd livekit-server
-        docker build -t livekit-server:test .
+        docker build --progress=plain -t livekit-server:test .
         
     - name: Test LiveKit container startup
       run: |
@@ -144,6 +144,10 @@ jobs:
           -e LIVEKIT_API_KEY=testkey \
           -e LIVEKIT_API_SECRET=testsecret \
           livekit-server:test
+          
+        # Show immediate logs
+        echo "📋 Initial container logs:"
+        docker logs livekit-test || true
           
         # Wait for container to start
         sleep 15

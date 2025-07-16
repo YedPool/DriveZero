@@ -91,23 +91,63 @@ development: true
         """Download LiveKit server binary."""
         try:
             import requests
+            import platform
+            
+            # Detect architecture
+            arch = platform.machine()
+            logger.info(f"Detected architecture: {arch}")
+            
+            if arch == "x86_64":
+                binary_arch = "amd64"
+            elif arch == "aarch64":
+                binary_arch = "arm64"
+            else:
+                logger.error(f"Unsupported architecture: {arch}")
+                raise ValueError(f"Unsupported architecture: {arch}")
             
             # Download LiveKit server binary for Linux
-            url = "https://github.com/livekit/livekit/releases/latest/download/livekit_linux_amd64"
+            url = f"https://github.com/livekit/livekit/releases/latest/download/livekit-server_linux_{binary_arch}"
             logger.info(f"Downloading LiveKit server from {url}")
             
             response = requests.get(url, stream=True)
             response.raise_for_status()
+            logger.info(f"Download response status: {response.status_code}")
+            logger.info(f"Content-Length: {response.headers.get('content-length', 'unknown')}")
             
             # Create directory and write binary
             os.makedirs("/usr/local/bin", exist_ok=True)
             
+            total_size = 0
             with open("/usr/local/bin/livekit-server", "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
+                    total_size += len(chunk)
+            
+            logger.info(f"Downloaded {total_size} bytes")
+            
+            # Check file info before making executable
+            logger.info("File info before chmod:")
+            logger.info(f"  Size: {os.path.getsize('/usr/local/bin/livekit-server')} bytes")
+            logger.info(f"  Exists: {os.path.exists('/usr/local/bin/livekit-server')}")
             
             # Make executable
             os.chmod("/usr/local/bin/livekit-server", 0o755)
+            
+            # Check file info after chmod
+            logger.info("File info after chmod:")
+            stat_info = os.stat("/usr/local/bin/livekit-server")
+            logger.info(f"  Mode: {oct(stat_info.st_mode)}")
+            logger.info(f"  Size: {stat_info.st_size} bytes")
+            
+            # Try to get file type if 'file' command is available
+            try:
+                import subprocess
+                result = subprocess.run(['file', '/usr/local/bin/livekit-server'], 
+                                      capture_output=True, text=True)
+                logger.info(f"File type: {result.stdout.strip()}")
+            except:
+                logger.info("Could not determine file type")
+            
             logger.info("✓ Downloaded and installed LiveKit server")
             
         except Exception as e:
