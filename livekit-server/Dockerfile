@@ -32,23 +32,28 @@ RUN echo "System info:" && \
     else \
         echo "Unsupported architecture: $arch"; exit 1; \
     fi && \
-    download_url="https://github.com/livekit/livekit/releases/latest/download/livekit-server_linux_${binary_arch}" && \
+    # Get latest version for proper filename
+    latest_version=$(curl -s https://api.github.com/repos/livekit/livekit/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    echo "Latest LiveKit version: $latest_version" && \
+    download_url="https://github.com/livekit/livekit/releases/download/${latest_version}/livekit_${latest_version#v}_linux_${binary_arch}.tar.gz" && \
     echo "Downloading LiveKit server from: $download_url" && \
-    curl -L -f --retry 3 --retry-delay 2 "$download_url" -o /usr/local/bin/livekit-server && \
-    echo "Download completed, validating..." && \
+    curl -L -f --retry 3 --retry-delay 2 "$download_url" -o /tmp/livekit.tar.gz && \
+    echo "Download completed, extracting..." && \
+    cd /tmp && \
+    tar -xzf livekit.tar.gz && \
+    ls -la /tmp/ && \
+    # Find the livekit-server binary in extracted files
+    find /tmp -name "livekit-server" -type f && \
+    cp $(find /tmp -name "livekit-server" -type f) /usr/local/bin/livekit-server && \
+    chmod +x /usr/local/bin/livekit-server && \
+    echo "Binary installation completed, validating..." && \
     ls -la /usr/local/bin/livekit-server && \
     file_size=$(stat -c%s /usr/local/bin/livekit-server) && \
     echo "File size: $file_size bytes" && \
-    if [ "$file_size" -lt 1000000 ]; then \
-        echo "ERROR: Downloaded file is too small ($file_size bytes), likely an error page" && \
-        echo "File contents:" && \
-        head -c 500 /usr/local/bin/livekit-server && \
-        exit 1; \
-    fi && \
     file /usr/local/bin/livekit-server && \
-    chmod +x /usr/local/bin/livekit-server && \
     echo "Binary validation successful" && \
-    ldd /usr/local/bin/livekit-server || echo "ldd failed - static binary or missing dependencies"
+    ldd /usr/local/bin/livekit-server || echo "ldd failed - static binary or missing dependencies" && \
+    rm -rf /tmp/livekit.tar.gz /tmp/livekit_*
 
 # Create directory for config files
 RUN mkdir -p /tmp
