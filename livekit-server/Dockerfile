@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 
-# Download LiveKit server binary during build with better debugging
+# Download LiveKit server binary during build with validation
 RUN echo "System info:" && \
     uname -a && \
     dpkg --print-architecture && \
@@ -34,13 +34,20 @@ RUN echo "System info:" && \
     fi && \
     download_url="https://github.com/livekit/livekit/releases/latest/download/livekit-server_linux_${binary_arch}" && \
     echo "Downloading LiveKit server from: $download_url" && \
-    curl -L "$download_url" -o /usr/local/bin/livekit-server && \
-    echo "Download completed, file info:" && \
+    curl -L -f --retry 3 --retry-delay 2 "$download_url" -o /usr/local/bin/livekit-server && \
+    echo "Download completed, validating..." && \
     ls -la /usr/local/bin/livekit-server && \
+    file_size=$(stat -c%s /usr/local/bin/livekit-server) && \
+    echo "File size: $file_size bytes" && \
+    if [ "$file_size" -lt 1000000 ]; then \
+        echo "ERROR: Downloaded file is too small ($file_size bytes), likely an error page" && \
+        echo "File contents:" && \
+        head -c 500 /usr/local/bin/livekit-server && \
+        exit 1; \
+    fi && \
     file /usr/local/bin/livekit-server && \
     chmod +x /usr/local/bin/livekit-server && \
-    echo "Final binary info:" && \
-    file /usr/local/bin/livekit-server && \
+    echo "Binary validation successful" && \
     ldd /usr/local/bin/livekit-server || echo "ldd failed - static binary or missing dependencies"
 
 # Create directory for config files

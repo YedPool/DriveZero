@@ -168,13 +168,19 @@ development: true
                 logger.info(f"  Size: {stat_info.st_size} bytes")
                 logger.info(f"  Mode: {oct(stat_info.st_mode)}")
                 
-                # Check file type
+                # Check file type and contents
                 try:
                     import subprocess
                     result = subprocess.run(['file', binary_path], capture_output=True, text=True)
                     logger.info(f"  File type: {result.stdout.strip()}")
+                    
+                    # Show file contents since it's only 9 bytes
+                    with open(binary_path, 'rb') as f:
+                        content = f.read()
+                        logger.info(f"  File contents (hex): {content.hex()}")
+                        logger.info(f"  File contents (text): {content.decode('utf-8', errors='ignore')}")
                 except Exception as e:
-                    logger.info(f"  Could not determine file type: {e}")
+                    logger.info(f"  Could not analyze file: {e}")
                 
                 # Test if it's executable by trying to run it with --help
                 try:
