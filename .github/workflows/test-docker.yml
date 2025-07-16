@@ -5,11 +5,13 @@ on:
     branches: [ main, voice-functionality-no-packages ]
     paths: 
       - 'cerebrium/**'
+      - 'livekit-server/**'
       - '.github/workflows/test-docker.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'cerebrium/**'
+      - 'livekit-server/**'
   workflow_dispatch:
 
 jobs:
