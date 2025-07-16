@@ -192,3 +192,107 @@ jobs:
         echo "🧹 Cleaning up..."
         docker stop livekit-test || true
         docker rm livekit-test || true
+
+  test-token-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Token Server Docker image
+      run: |
+        cd livekit-token-server
+        docker build --progress=plain -t livekit-token-server:test .
+        
+    - name: Test Token Server container startup
+      run: |
+        # Start container in background with required environment variables
+        docker run -d --name token-server-test \
+          -p 8000:8000 \
+          -e LIVEKIT_API_KEY=testkey \
+          -e LIVEKIT_API_SECRET=testsecret \
+          -e LIVEKIT_URL=ws://localhost:7880 \
+          livekit-token-server:test
+          
+        # Show immediate logs
+        echo "📋 Initial token server logs:"
+        docker logs token-server-test || true
+          
+        # Wait for container to start
+        sleep 10
+        
+        # Check if container is still running
+        if docker ps | grep -q token-server-test; then
+          echo "✅ Token server container started successfully"
+        else
+          echo "❌ Token server container failed to start"
+          docker logs token-server-test
+          exit 1
+        fi
+        
+    - name: Test Token Server health endpoint
+      run: |
+        # Wait up to 30 seconds for server to be ready
+        timeout=30
+        elapsed=0
+        
+        while [ $elapsed -lt $timeout ]; do
+          if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+            echo "✅ Token server health endpoint responding"
+            curl -s http://localhost:8000/health | jq .
+            break
+          fi
+          echo "⏳ Waiting for token server... ($elapsed/$timeout seconds)"
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "❌ Token server health endpoint failed to respond"
+          docker logs token-server-test
+          exit 1
+        fi
+        
+    - name: Test token generation endpoint
+      run: |
+        # Test token generation
+        echo "🔐 Testing token generation..."
+        response=$(curl -s -X POST http://localhost:8000/token \
+          -H "Content-Type: application/json" \
+          -d '{
+            "room": "test-room",
+            "identity": "test-user",
+            "name": "Test User"
+          }')
+        
+        echo "Token generation response:"
+        echo "$response" | jq .
+        
+        # Check if token was generated successfully
+        if echo "$response" | jq -e '.token' > /dev/null; then
+          echo "✅ Token generation successful"
+        else
+          echo "❌ Token generation failed"
+          echo "Response: $response"
+          exit 1
+        fi
+        
+    - name: Test root endpoint
+      run: |
+        echo "📡 Testing root endpoint..."
+        curl -s http://localhost:8000/ | jq .
+        
+    - name: Token server logs and cleanup
+      if: always()
+      run: |
+        echo "📋 Token server logs:"
+        docker logs token-server-test || true
+        
+        echo "🧹 Cleaning up..."
+        docker stop token-server-test || true
+        docker rm token-server-test || true
