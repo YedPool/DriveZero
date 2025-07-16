@@ -174,11 +174,14 @@ development: true
                     result = subprocess.run(['file', binary_path], capture_output=True, text=True)
                     logger.info(f"  File type: {result.stdout.strip()}")
                     
-                    # Show file contents since it's only 9 bytes
-                    with open(binary_path, 'rb') as f:
-                        content = f.read()
-                        logger.info(f"  File contents (hex): {content.hex()}")
-                        logger.info(f"  File contents (text): {content.decode('utf-8', errors='ignore')}")
+                    # Only show file contents if it's suspiciously small (likely an error)
+                    if stat_info.st_size < 1000:
+                        with open(binary_path, 'rb') as f:
+                            content = f.read()
+                            logger.info(f"  File contents (hex): {content.hex()}")
+                            logger.info(f"  File contents (text): {content.decode('utf-8', errors='ignore')}")
+                    else:
+                        logger.info(f"  Binary appears valid (size: {stat_info.st_size} bytes)")
                 except Exception as e:
                     logger.info(f"  Could not analyze file: {e}")
                 
