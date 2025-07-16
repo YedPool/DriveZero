@@ -6,6 +6,9 @@ on:
     paths: 
       - 'cerebrium/**'
       - 'livekit-server/**'
+      - 'livekit-token-server/**'
+      - 'sesame-tts/**'
+      - 'whisper-stt/**'
       - '.github/workflows/test-docker.yml'
   pull_request:
     branches: [ main ]
