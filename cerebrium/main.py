@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import AgentSession, Agent, cli, WorkerOptions, WorkerType
 from livekit.plugins import openai, deepgram, silero
+from livekit.plugins.deepgram import STT as DeepgramSTT, TTS as DeepgramTTS
 from livekit.plugins.turn_detector.english import EnglishModel
 from livekit.agents import metrics, MetricsCollectedEvent
 
@@ -73,6 +74,38 @@ def get_livekit_connection_url():
         logger.warning(f"CEREBRIUM_PROJECT_ID not set, using fallback: {url}")
         return url
 
+def get_whisper_stt_url():
+    """Service discovery for Whisper STT service."""
+    cerebrium_project_id = os.getenv("CEREBRIUM_PROJECT_ID")
+    stt_deployment_name = os.getenv("WHISPER_DEPLOYMENT_NAME", "whisper-stt")
+    
+    if cerebrium_project_id:
+        # Production: Use Cerebrium service URL
+        url = f"wss://api.aws.us-east-1.cerebrium.ai/v4/p-{cerebrium_project_id}/{stt_deployment_name}:8002/v1/listen"
+        logger.info(f"Agent connecting to Cerebrium Whisper STT: {url}")
+        return url
+    else:
+        # Fallback: Local development
+        url = os.getenv("WHISPER_STT_URL", "ws://localhost:8002/v1/listen")
+        logger.warning(f"CEREBRIUM_PROJECT_ID not set, using Whisper STT fallback: {url}")
+        return url
+
+def get_sesame_tts_url():
+    """Service discovery for Sesame TTS service."""
+    cerebrium_project_id = os.getenv("CEREBRIUM_PROJECT_ID")
+    tts_deployment_name = os.getenv("SESAME_DEPLOYMENT_NAME", "sesame-tts")
+    
+    if cerebrium_project_id:
+        # Production: Use Cerebrium service URL
+        url = f"http://api.aws.us-east-1.cerebrium.ai/v4/p-{cerebrium_project_id}/{tts_deployment_name}:8001/v1/speak"
+        logger.info(f"Agent connecting to Cerebrium Sesame TTS: {url}")
+        return url
+    else:
+        # Fallback: Local development
+        url = os.getenv("SESAME_TTS_URL", "http://localhost:8001/v1/speak")
+        logger.warning(f"CEREBRIUM_PROJECT_ID not set, using Sesame TTS fallback: {url}")
+        return url
+
 async def entrypoint(ctx: agents.JobContext):
     """
     Main entrypoint for the LiveKit agent.
@@ -80,15 +113,21 @@ async def entrypoint(ctx: agents.JobContext):
     """
     # Log service discovery information
     livekit_url = get_livekit_connection_url()
+    whisper_stt_url = get_whisper_stt_url()
+    sesame_tts_url = get_sesame_tts_url()
+    
     logger.info(f"Agent starting with LiveKit URL: {livekit_url}")
+    logger.info(f"Agent using Whisper STT: {whisper_stt_url}")
+    logger.info(f"Agent using Sesame TTS: {sesame_tts_url}")
     
     await ctx.connect()
     
     # Configure the agent session with required services
     session = AgentSession(
-        # Speech-to-Text: Deepgram Nova-2
-        stt=deepgram.STT(
-            model="nova-2",
+        # Speech-to-Text: Whisper STT Service
+        stt=DeepgramSTT(
+            base_url=whisper_stt_url,
+            model="whisper-base",  # Your Whisper model
             language="en-US",
             smart_format=True,
             profanity_filter=False,
@@ -103,9 +142,10 @@ async def entrypoint(ctx: agents.JobContext):
             temperature=0.7,
         ),
         
-        # Text-to-Speech: Deepgram Rime
-        tts=deepgram.TTS(
-            model="aura-asteria-en",
+        # Text-to-Speech: Sesame TTS Service
+        tts=DeepgramTTS(
+            base_url=sesame_tts_url,
+            model="sesame-csm",  # Your Sesame model
             encoding="linear16",
             sample_rate=24000,
         ),
