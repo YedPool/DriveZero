@@ -32,7 +32,7 @@ jobs:
     - name: Build Docker image
       run: |
         cd cerebrium
-        docker build -t gmail-voice-assistant:test .
+        docker build --progress=plain --no-cache -t gmail-voice-assistant:test .
         
     - name: Test container startup
       run: |
@@ -210,7 +210,7 @@ jobs:
     - name: Build Token Server Docker image
       run: |
         cd livekit-token-server
-        docker build --progress=plain -t livekit-token-server:test .
+        docker build --progress=plain --no-cache -t livekit-token-server:test .
         
     - name: Test Token Server container startup
       run: |
@@ -314,12 +314,12 @@ jobs:
     - name: Build Whisper STT Docker image
       run: |
         cd whisper-stt
-        docker build --progress=plain -t whisper-stt:test .
+        docker build --progress=plain --no-cache -t whisper-stt:test .
         
     - name: Build Sesame TTS Docker image
       run: |
         cd sesame-tts
-        docker build --progress=plain -t sesame-tts:test .
+        docker build --progress=plain --no-cache -t sesame-tts:test .
         
     - name: Test Whisper STT container startup
       run: |
